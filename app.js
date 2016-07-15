@@ -5,6 +5,7 @@
     // Initial declarations
     var cnv = document.getElementById('cnv');
     var ctx = cnv.getContext("2d");
+    ctx.translate(cnv.width/2, cnv.height/2);
     var delta = 0;
     var lastTimeCalled = 0;
     var maxFPS = 60;
@@ -44,8 +45,9 @@
 
     // Draws the canvas according to state
     function drawCanvas() {
-        ctx.clearRect(0, 0, cnv.width, cnv.height);
-        ctx.strokeRect(20,20,150,testVar);
+        ctx.clearRect((cnv.width/2)*-1, (cnv.height/2)*-1, cnv.width, cnv.height);
+        ctx.rotate(Math.PI*2/600);
+        ctx.strokeRect(-75, 0 - testVar/2, 150, testVar);
     }
 
     // RUN! Starts the 'game'...
