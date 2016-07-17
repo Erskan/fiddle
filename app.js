@@ -11,7 +11,7 @@ var lastTimeCalled = 0;
 var maxFPS = 60;
 var frameID;
 
-var testVar = 20;
+var testVar = 20, testX = -75, testY = 0;
 var testStep = 0.1;
 var testSig = 'pos';
 
@@ -31,6 +31,12 @@ function mainLoop(timecalled) {
 
 // Updates the state
 function update(delta) {
+    // Handle movement
+    if (Key.isDown(Key.UP)) testY--;
+    if (Key.isDown(Key.LEFT)) testX--;
+    if (Key.isDown(Key.DOWN)) testY++;
+    if (Key.isDown(Key.RIGHT)) testX++;
+
     if(testVar <= 20) {
         testVar += testStep*delta;
         testSig = 'pos';
@@ -48,7 +54,7 @@ function update(delta) {
 function drawCanvas() {
     ctx.clearRect((cnv.width/2)*-1, (cnv.height/2)*-1, cnv.width, cnv.height);
     ctx.rotate(Math.PI*2/600);
-    ctx.strokeRect(-75, 0 - testVar/2, 150, testVar);
+    ctx.strokeRect(testX, testY - testVar/2, 150, testVar);
 }
 
 function toggleRun() {
@@ -71,6 +77,36 @@ function startRun() {
         frameID = requestAnimationFrame(mainLoop);
     });
 }
+
+// KEYBOARD
+// ===================================
+// Thanks to: http://nokarma.org/2011/02/27/javascript-game-development-keyboard-input/
+// for the key object help.
+// ===================================
+// Key object definition to help with managing key events
+var Key = {
+    _pressed: {},
+
+    LEFT: 37,
+    UP: 38,
+    RIGHT: 39,
+    DOWN: 40,
+    
+    isDown: function(keyCode) {
+        return this._pressed[keyCode];
+    },
+    
+    onKeydown: function(event) {
+        this._pressed[event.keyCode] = true;
+    },
+    
+    onKeyup: function(event) {
+        delete this._pressed[event.keyCode];
+    }
+};
+// Wire the event listeners
+window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
+window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
 
 // RUN! Starts the 'game'...
 requestAnimationFrame(mainLoop);
