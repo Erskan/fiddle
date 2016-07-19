@@ -159,5 +159,11 @@ var Key = {
 window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
 
+// SMARTPHONE - Use the accelerometer if possible
+window.ondevicemotion = function(event) {
+    testSpeedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
+    testSpeedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
+}
+
 // RUN! Starts the 'game'...
 requestAnimationFrame(mainLoop);
