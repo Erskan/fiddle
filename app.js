@@ -136,6 +136,7 @@ function startRun() {
 var Key = {
     _pressed: {},
 
+    SPACE: 32,
     LEFT: 37,
     UP: 38,
     RIGHT: 39,
@@ -150,6 +151,7 @@ var Key = {
     },
     
     onKeyup: function(event) {
+        if(event.keyCode === Key.SPACE) toggleRun(); // Pause with SPACE. Should probably not be here...
         delete this._pressed[event.keyCode];
     }
 };
