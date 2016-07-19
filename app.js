@@ -4,19 +4,23 @@ console.log('Setting initial values...');
 // Initial declarations
 var isRunning = true;
 var cnv = document.getElementById('cnv');
+cnv.width = window.innerWidth;
+cnv.height = window.innerHeight;
 var ctx = cnv.getContext("2d");
-ctx.translate(cnv.width/2, cnv.height/2);
+/* Set origo in the center of the canvas*/
+//ctx.translate(cnv.width/2, cnv.height/2);
 var delta = 0;
 var lastTimeCalled = 0;
 var maxFPS = 60;
 var frameID;
 
-var testVar = 20, testX = -75, testY = 0;
+var testVar = 20, testX = 100, testY = 100, testAcc = 0.003, testSpeedX = 0, testSpeedY = 0;
 var testStep = 0.1;
 var testSig = 'pos';
 
 // The main game loop
 function mainLoop(timecalled) {
+    // Don't do work if it's not time yet
     if (timecalled < lastTimeCalled + (1000 / maxFPS)) {
         frameID = requestAnimationFrame(mainLoop);
         return;
@@ -31,13 +35,13 @@ function mainLoop(timecalled) {
 
 // Updates the state
 function update(delta) {
-    // Handle movement
-    if (Key.isDown(Key.UP)) testY--;
-    if (Key.isDown(Key.LEFT)) testX--;
-    if (Key.isDown(Key.DOWN)) testY++;
-    if (Key.isDown(Key.RIGHT)) testX++;
+    
+    updateMovement(delta);
 
-    if(testVar <= 20) {
+    updatePositions(delta);
+
+    /*Pulsation*/
+    /*if(testVar <= 20) {
         testVar += testStep*delta;
         testSig = 'pos';
     }else if(testVar >= 50) {
@@ -47,16 +51,61 @@ function update(delta) {
         testVar += testStep*delta;
     }else if(testSig === 'neg') {
         testVar -= testStep*delta;
+    }*/
+}
+
+function updateMovement(delta) {
+    if (Key.isDown(Key.UP)) {
+        testSpeedY -= testAcc*delta;
+    } 
+    if (Key.isDown(Key.LEFT)) {
+        testSpeedX -= testAcc*delta*2; // Horizontal acceleration feels sluggish
     }
+    if (Key.isDown(Key.DOWN)) {
+        testSpeedY += testAcc*delta;
+    }
+    if (Key.isDown(Key.RIGHT)) {
+        testSpeedX += testAcc*delta*2; // Horizontal acceleration feels sluggish
+    }
+}
+
+// Change positional state based on speed
+function updatePositions(delta) {
+    testY += testSpeedY;
+    testX += testSpeedX;
+    // Retardation
+    if (testSpeedX < 0.01 && testSpeedX > -0.01)
+        testSpeedX = 0;
+    else
+        testSpeedX -= (testSpeedX > 0) ? testAcc/2*delta : (testAcc/2)*-1*delta;
+    if (testSpeedY < 0.01 && testSpeedY > -0.01)
+        testSpeedY = 0;
+    else
+        testSpeedY -= (testSpeedY > 0) ? testAcc/2*delta : (testAcc/2)*-1*delta;
+
+    checkGameBoundaries();
+}
+
+// Don't allow exiting the game boundaries. Bounce back.
+function checkGameBoundaries() {
+    if((testY <= 10 && testSpeedY < 0) || (testY >= cnv.height - 10 && testSpeedY > 0))
+        testSpeedY = -1*testSpeedY/2;
+    if((testX <= 0 && testSpeedX < 0) || (testX >= cnv.width - 150 && testSpeedX > 0))
+        testSpeedX = -1*testSpeedX/2;
 }
 
 // Draws the canvas according to state
 function drawCanvas() {
-    ctx.clearRect((cnv.width/2)*-1, (cnv.height/2)*-1, cnv.width, cnv.height);
-    ctx.rotate(Math.PI*2/600);
+    // Clear area for fresh drawing
+    ctx.clearRect(0, 0, cnv.width, cnv.height);
+    // Make sure canvas is exactly full browser size 
+    cnv.width = window.innerWidth;
+    cnv.height = window.innerHeight;
+    // Draw objects!
     ctx.strokeRect(testX, testY - testVar/2, 150, testVar);
 }
 
+// Toggles simulation of time
 function toggleRun() {
     isRunning = isRunning ? false : true;
     if(isRunning) {
