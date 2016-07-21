@@ -14,11 +14,13 @@ var lastTimeCalled = 0;
 var maxFPS = 60;
 var frameID;
 
+// Player variables
 var testVar = 20, testX = 100, testY = 100, testAcc = 0.003, testSpeedX = 0, testSpeedY = 0;
-var testStep = 0.1;
-var testSig = 'pos';
+// Target variables
+var target = generateTarget();
+var currentTarget = 0;
 
-// The main game loop
+// MAIN LOOP
 function mainLoop(timecalled) {
     // Don't do work if it's not time yet
     if (timecalled < lastTimeCalled + (1000 / maxFPS)) {
@@ -29,7 +31,7 @@ function mainLoop(timecalled) {
     lastTimeCalled = timecalled;
 
     update(delta);
-    drawCanvas();
+    draw();
     frameID = requestAnimationFrame(mainLoop);
 }
 
@@ -84,27 +86,71 @@ function updatePositions(delta) {
         testSpeedY -= (testSpeedY > 0) ? testAcc/2*delta : (testAcc/2)*-1*delta;
 
     checkGameBoundaries();
+    checkTargetCollision();
 }
 
 // Don't allow exiting the game boundaries. Bounce back.
 function checkGameBoundaries() {
-    if((testY <= 10 && testSpeedY < 0) || (testY >= cnv.height - 10 && testSpeedY > 0))
+    if((testY <= testVar/2 && testSpeedY < 0) || (testY >= cnv.height - testVar/2 && testSpeedY > 0))
         testSpeedY = -1*testSpeedY/2;
-    if((testX <= 0 && testSpeedX < 0) || (testX >= cnv.width - 150 && testSpeedX > 0))
+    if((testX <= testVar/2 && testSpeedX < 0) || (testX >= cnv.width - testVar/2 && testSpeedX > 0))
         testSpeedX = -1*testSpeedX/2;
 }
 
+function checkTargetCollision() {
+    var xDiff = Math.abs(testX - target['x']);
+    var yDiff = Math.abs(testY - target['y']);
+    if(xDiff < target['size']/4 && yDiff < target['size']/4) {
+        currentTarget++;
+        target = generateTarget();
+    }
+}
+
+function generateTarget() {
+    return {
+        id: currentTarget,
+        x: Math.floor(Math.random()*cnv.width),
+        y: Math.floor(Math.random()*cnv.height),
+        size: Math.floor(Math.random()*10 + 2)
+    };
+}
+
+// DRAWING
 // Draws the canvas according to state
-function drawCanvas() {
+function draw() {
     // Clear area for fresh drawing
     ctx.clearRect(0, 0, cnv.width, cnv.height);
     // Make sure canvas is exactly full browser size 
     cnv.width = window.innerWidth;
     cnv.height = window.innerHeight;
+
     // Draw objects!
-    ctx.strokeRect(testX, testY - testVar/2, 150, testVar);
+    drawPlayer();
+    drawTargets();
+    drawGUI();
+    //ctx.strokeRect(testX, testY - testVar/2, 150, testVar);
 }
 
+function drawPlayer() {
+    ctx.beginPath();
+    ctx.arc(testX, testY, testVar, 0, 2 * Math.PI, false);
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+}
+
+function drawTargets() {
+    ctx.beginPath();
+    ctx.arc(target['x'], target['y'], target['size'], 0, 2 * Math.PI, false);
+    ctx.strokeStyle = '#ff00b0';
+    ctx.stroke();
+}
+
+function drawGUI() {
+    ctx.font = '20pt Helvetica';
+    ctx.fillText(currentTarget, 30, 40);
+}
+
+// SIMULATION CONTROL
 // Toggles simulation of time
 function toggleRun() {
     isRunning = isRunning ? false : true;
