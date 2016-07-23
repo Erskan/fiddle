@@ -2,7 +2,14 @@
 
 console.log('Setting initial values...');
 // Initial declarations
+var gameStates = Object.freeze({
+    START: 0,
+    TIMED: 1,
+    END: 2
+});
 var isRunning = true;
+var gameState = gameStates.START;
+var gameTime = Date.now(), gameEnd = Date.now() + 15000;
 var cnv = document.getElementById('cnv');
 cnv.width = window.innerWidth;
 cnv.height = window.innerHeight;
@@ -30,6 +37,11 @@ function mainLoop(timecalled) {
     delta = timecalled - lastTimeCalled; // get the delta time since last frame
     lastTimeCalled = timecalled;
 
+    if(gameState === gameStates.END && isRunning) {
+        toggleRun();
+        return;
+    }
+
     update(delta);
     draw();
     frameID = requestAnimationFrame(mainLoop);
@@ -41,6 +53,8 @@ function update(delta) {
     updateMovement(delta);
 
     updatePositions(delta);
+
+    checkTimer();
 
     /*Pulsation*/
     /*if(testVar <= 20) {
@@ -89,29 +103,34 @@ function updatePositions(delta) {
     checkTargetCollision();
 }
 
+function checkTimer() {
+
+}
+
 // Don't allow exiting the game boundaries. Bounce back.
 function checkGameBoundaries() {
-    if((testY <= testVar/2 && testSpeedY < 0) || (testY >= cnv.height - testVar/2 && testSpeedY > 0))
+    if((testY <= testVar && testSpeedY < 0) || (testY >= cnv.height - testVar && testSpeedY > 0))
         testSpeedY = -1*testSpeedY/2;
-    if((testX <= testVar/2 && testSpeedX < 0) || (testX >= cnv.width - testVar/2 && testSpeedX > 0))
+    if((testX <= testVar && testSpeedX < 0) || (testX >= cnv.width - testVar && testSpeedX > 0))
         testSpeedX = -1*testSpeedX/2;
 }
 
 function checkTargetCollision() {
     var xDiff = Math.abs(testX - target['x']);
     var yDiff = Math.abs(testY - target['y']);
-    if(xDiff < target['size']/4 && yDiff < target['size']/4) {
+    if(xDiff < target['size'] && yDiff < target['size']) {
         currentTarget++;
         target = generateTarget();
+        gameEnd += 2000;
     }
 }
 
 function generateTarget() {
     return {
         id: currentTarget,
-        x: Math.floor(Math.random()*cnv.width),
-        y: Math.floor(Math.random()*cnv.height),
-        size: Math.floor(Math.random()*10 + 2)
+        size: 10,
+        x: Math.floor(Math.random()*(cnv.width - 20)) + 20, // 20 = 2*radius
+        y: Math.floor(Math.random()*(cnv.height - 20)) + 20
     };
 }
 
@@ -128,7 +147,6 @@ function draw() {
     drawPlayer();
     drawTargets();
     drawGUI();
-    //ctx.strokeRect(testX, testY - testVar/2, 150, testVar);
 }
 
 function drawPlayer() {
@@ -148,6 +166,12 @@ function drawTargets() {
 function drawGUI() {
     ctx.font = '20pt Helvetica';
     ctx.fillText(currentTarget, 30, 40);
+    gameTime = Date.now();
+    if((gameEnd - gameTime)/1000 <= 0) {
+        gameState = gameStates.END;
+        return;
+    }
+    ctx.fillText((gameEnd - gameTime)/1000, cnv.width - 100, cnv.height - 40);
 }
 
 // SIMULATION CONTROL
@@ -212,4 +236,5 @@ window.ondevicemotion = function(event) {
 }
 
 // RUN! Starts the 'game'...
+gameState = gameStates.TIMED;
 requestAnimationFrame(mainLoop);
