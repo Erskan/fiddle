@@ -2,6 +2,7 @@
 
 console.log('Setting initial values...');
 // Initial declarations
+// GAME
 var gameStates = Object.freeze({
     START: 0,
     TIMED: 1,
@@ -10,22 +11,27 @@ var gameStates = Object.freeze({
 var isRunning = true;
 var gameState = gameStates.START;
 var gameTime = Date.now(), gameEnd = Date.now() + 15000;
+
+// CANVAS
 var cnv = document.getElementById('cnv');
 cnv.width = window.innerWidth;
 cnv.height = window.innerHeight;
 var ctx = cnv.getContext("2d");
 /* Set origo in the center of the canvas*/
 //ctx.translate(cnv.width/2, cnv.height/2);
+
+// TIMING
 var delta = 0;
 var lastTimeCalled = 0;
 var maxFPS = 60;
 var frameID;
 
-// Player variables
-var testVar = 20, testX = 100, testY = 100, testAcc = 0.003, testSpeedX = 0, testSpeedY = 0;
+// PLAYER AND OBJECTS
+var playerSize = 20, playerX = 100, playerY = 100, playerAcc = 0.003, playerSpeedX = 0, playerSpeedY = 0;
 // Target variables
 var target = generateTarget();
 var currentTarget = 0;
+var animationQueue = [];
 
 // MAIN LOOP
 function mainLoop(timecalled) {
@@ -52,9 +58,11 @@ function update(delta) {
     
     updateMovement(delta);
 
+    updateAnimations(delta);
+
     updatePositions(delta);
 
-    checkTimer();
+    //checkTimer();
 
     /*Pulsation*/
     /*if(testVar <= 20) {
@@ -72,56 +80,72 @@ function update(delta) {
 
 function updateMovement(delta) {
     if (Key.isDown(Key.UP)) {
-        testSpeedY -= testAcc*delta;
+        playerSpeedY -= playerAcc*delta;
     } 
     if (Key.isDown(Key.LEFT)) {
-        testSpeedX -= testAcc*delta*2; // Horizontal acceleration feels sluggish
+        playerSpeedX -= playerAcc*delta*2; // Horizontal acceleration feels sluggish
     }
     if (Key.isDown(Key.DOWN)) {
-        testSpeedY += testAcc*delta;
+        playerSpeedY += playerAcc*delta;
     }
     if (Key.isDown(Key.RIGHT)) {
-        testSpeedX += testAcc*delta*2; // Horizontal acceleration feels sluggish
+        playerSpeedX += playerAcc*delta*2; // Horizontal acceleration feels sluggish
+    }
+}
+
+function updateAnimations(delta) {
+    if(animationQueue.length > 0) {
+        animationQueue.forEach(function(obj) {
+            if(obj.end < Date.now()) {
+                animationQueue.splice(animationQueue.indexOf(obj), 1);
+                return;
+            }
+            
+        }, this);
     }
 }
 
 // Change positional state based on speed
 function updatePositions(delta) {
-    testY += testSpeedY;
-    testX += testSpeedX;
+    playerY += playerSpeedY;
+    playerX += playerSpeedX;
     // Retardation
-    if (testSpeedX < 0.01 && testSpeedX > -0.01)
-        testSpeedX = 0;
+    if (playerSpeedX < 0.01 && playerSpeedX > -0.01)
+        playerSpeedX = 0;
     else
-        testSpeedX -= (testSpeedX > 0) ? testAcc/2*delta : (testAcc/2)*-1*delta;
-    if (testSpeedY < 0.01 && testSpeedY > -0.01)
-        testSpeedY = 0;
+        playerSpeedX -= (playerSpeedX > 0) ? playerAcc/2*delta : (playerAcc/2)*-1*delta;
+    if (playerSpeedY < 0.01 && playerSpeedY > -0.01)
+        playerSpeedY = 0;
     else
-        testSpeedY -= (testSpeedY > 0) ? testAcc/2*delta : (testAcc/2)*-1*delta;
+        playerSpeedY -= (playerSpeedY > 0) ? playerAcc/2*delta : (playerAcc/2)*-1*delta;
 
     checkGameBoundaries();
     checkTargetCollision();
 }
 
-function checkTimer() {
-
-}
-
 // Don't allow exiting the game boundaries. Bounce back.
 function checkGameBoundaries() {
-    if((testY <= testVar && testSpeedY < 0) || (testY >= cnv.height - testVar && testSpeedY > 0))
-        testSpeedY = -1*testSpeedY/2;
-    if((testX <= testVar && testSpeedX < 0) || (testX >= cnv.width - testVar && testSpeedX > 0))
-        testSpeedX = -1*testSpeedX/2;
+    if((playerY <= playerSize && playerSpeedY < 0) || (playerY >= cnv.height - playerSize && playerSpeedY > 0))
+        playerSpeedY = -1*playerSpeedY/2;
+    if((playerX <= playerSize && playerSpeedX < 0) || (playerX >= cnv.width - playerSize && playerSpeedX > 0))
+        playerSpeedX = -1*playerSpeedX/2;
 }
 
 function checkTargetCollision() {
-    var xDiff = Math.abs(testX - target['x']);
-    var yDiff = Math.abs(testY - target['y']);
+    var xDiff = Math.abs(playerX - target['x']);
+    var yDiff = Math.abs(playerY - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
         currentTarget++;
         target = generateTarget();
         gameEnd += 2000;
+        animationQueue.push({
+            start: Date.now(),
+            end: Date.now() + 2000,
+            type: 'text',
+            value: '2+',
+            x: playerX,
+            y: playerY
+        });
     }
 }
 
@@ -146,12 +170,13 @@ function draw() {
     // Draw objects!
     drawPlayer();
     drawTargets();
+    drawAnimations();
     drawGUI();
 }
 
 function drawPlayer() {
     ctx.beginPath();
-    ctx.arc(testX, testY, testVar, 0, 2 * Math.PI, false);
+    ctx.arc(playerX, playerY, playerSize, 0, 2 * Math.PI, false);
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 }
@@ -161,6 +186,19 @@ function drawTargets() {
     ctx.arc(target['x'], target['y'], target['size'], 0, 2 * Math.PI, false);
     ctx.strokeStyle = '#ff00b0';
     ctx.stroke();
+}
+
+function drawAnimations() {
+    animationQueue.forEach(function(obj) {
+        switch(obj.type) {
+            case 'text':
+                ctx.font = '20pt Helvetica';
+                ctx.fillText(obj.value, obj.x, obj.y);
+                break;
+            default:
+                break;
+        }
+    });
 }
 
 function drawGUI() {
@@ -231,8 +269,8 @@ window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, fa
 
 // SMARTPHONE - Use the accelerometer if possible
 window.ondevicemotion = function(event) {
-    testSpeedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
-    testSpeedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
+    playerSpeedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
+    playerSpeedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
 }
 
 // RUN! Starts the 'game'...
