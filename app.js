@@ -11,6 +11,7 @@ var gameStates = Object.freeze({
 var isRunning = true;
 var gameState = gameStates.START;
 var gameTime = Date.now(), gameEnd = Date.now() + 15000;
+var gameInfo = document.getElementById("gameinfo");
 
 // CANVAS
 var cnv = document.getElementById('cnv');
@@ -61,21 +62,6 @@ function update(delta) {
     updateAnimations(delta);
 
     updatePositions(delta);
-
-    //checkTimer();
-
-    /*Pulsation*/
-    /*if(testVar <= 20) {
-        testVar += testStep*delta;
-        testSig = 'pos';
-    }else if(testVar >= 50) {
-        testVar -= testStep*delta;
-        testSig = 'neg';
-    }else if(testSig === 'pos') {
-        testVar += testStep*delta;
-    }else if(testSig === 'neg') {
-        testVar -= testStep*delta;
-    }*/
 }
 
 function updateMovement(delta) {
@@ -100,6 +86,8 @@ function updateAnimations(delta) {
                 animationQueue.splice(animationQueue.indexOf(obj), 1);
                 return;
             }
+            obj.x++;
+            obj.y--;
             
         }, this);
     }
@@ -142,7 +130,7 @@ function checkTargetCollision() {
             start: Date.now(),
             end: Date.now() + 2000,
             type: 'text',
-            value: '2+',
+            value: '+2s',
             x: playerX,
             y: playerY
         });
@@ -225,11 +213,13 @@ function toggleRun() {
 }
 
 function stopRun() {
+    gameInfo.innerHTML = "GAME STOPPED";
     cancelAnimationFrame(frameID);
 }
 
 function startRun() {
     frameID = requestAnimationFrame(function(timestamp) {
+        gameInfo.innerHTML = "";
         lastTimeCalled = timestamp;
         frameID = requestAnimationFrame(mainLoop);
     });
