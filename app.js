@@ -4,9 +4,9 @@ console.log('Setting initial values...');
 // Initial declarations
 // GAME
 var gameStates = Object.freeze({
-    START: 0,
-    TIMED: 1,
-    END: 2
+    START:  0,
+    TIMED:  1,
+    END:    2
 });
 var isRunning = true;
 var gameState = gameStates.START;
@@ -28,7 +28,14 @@ var maxFPS = 60;
 var frameID;
 
 // PLAYER AND OBJECTS
-var playerSize = 20, playerX = 100, playerY = 100, playerAcc = 0.003, playerSpeedX = 0, playerSpeedY = 0;
+var player = {
+    size:   20,
+    x:      100,
+    y:      100,
+    acc:    0.003,
+    speedX: 0,
+    speedY: 0
+};
 // Target variables
 var target = generateTarget();
 var currentTarget = 0;
@@ -66,16 +73,16 @@ function update(delta) {
 
 function updateMovement(delta) {
     if (Key.isDown(Key.UP)) {
-        playerSpeedY -= playerAcc*delta;
+        player.speedY -= player.acc*delta;
     } 
     if (Key.isDown(Key.LEFT)) {
-        playerSpeedX -= playerAcc*delta*2; // Horizontal acceleration feels sluggish
+        player.speedX -= player.acc*delta*2; // Horizontal acceleration feels sluggish
     }
     if (Key.isDown(Key.DOWN)) {
-        playerSpeedY += playerAcc*delta;
+        player.speedY += player.acc*delta;
     }
     if (Key.isDown(Key.RIGHT)) {
-        playerSpeedX += playerAcc*delta*2; // Horizontal acceleration feels sluggish
+        player.speedX += player.acc*delta*2; // Horizontal acceleration feels sluggish
     }
 }
 
@@ -86,7 +93,6 @@ function updateAnimations(delta) {
                 animationQueue.splice(animationQueue.indexOf(obj), 1);
                 return;
             }
-            obj.x++;
             obj.y--;
             
         }, this);
@@ -95,17 +101,17 @@ function updateAnimations(delta) {
 
 // Change positional state based on speed
 function updatePositions(delta) {
-    playerY += playerSpeedY;
-    playerX += playerSpeedX;
+    player.y += player.speedY;
+    player.x += player.speedX;
     // Retardation
-    if (playerSpeedX < 0.01 && playerSpeedX > -0.01)
-        playerSpeedX = 0;
+    if (player.speedX < 0.01 && player.speedX > -0.01)
+        player.speedX = 0;
     else
-        playerSpeedX -= (playerSpeedX > 0) ? playerAcc/2*delta : (playerAcc/2)*-1*delta;
-    if (playerSpeedY < 0.01 && playerSpeedY > -0.01)
-        playerSpeedY = 0;
+        player.speedX -= (player.speedX > 0) ? player.acc/2*delta : (player.acc/2)*-1*delta;
+    if (player.speedY < 0.01 && player.speedY > -0.01)
+        player.speedY = 0;
     else
-        playerSpeedY -= (playerSpeedY > 0) ? playerAcc/2*delta : (playerAcc/2)*-1*delta;
+        player.speedY -= (player.speedY > 0) ? player.acc/2*delta : (player.acc/2)*-1*delta;
 
     checkGameBoundaries();
     checkTargetCollision();
@@ -113,15 +119,15 @@ function updatePositions(delta) {
 
 // Don't allow exiting the game boundaries. Bounce back.
 function checkGameBoundaries() {
-    if((playerY <= playerSize && playerSpeedY < 0) || (playerY >= cnv.height - playerSize && playerSpeedY > 0))
-        playerSpeedY = -1*playerSpeedY/2;
-    if((playerX <= playerSize && playerSpeedX < 0) || (playerX >= cnv.width - playerSize && playerSpeedX > 0))
-        playerSpeedX = -1*playerSpeedX/2;
+    if((player.y <= player.size && player.speedY < 0) || (player.y >= cnv.height - player.size && player.speedY > 0))
+        player.speedY = -1*player.speedY/2;
+    if((player.x <= player.size && player.speedX < 0) || (player.x >= cnv.width - player.size && player.speedX > 0))
+        player.speedX = -1*player.speedX/2;
 }
 
 function checkTargetCollision() {
-    var xDiff = Math.abs(playerX - target['x']);
-    var yDiff = Math.abs(playerY - target['y']);
+    var xDiff = Math.abs(player.x - target['x']);
+    var yDiff = Math.abs(player.y - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
         currentTarget++;
         target = generateTarget();
@@ -131,8 +137,8 @@ function checkTargetCollision() {
             end: Date.now() + 2000,
             type: 'text',
             value: '+2s',
-            x: playerX,
-            y: playerY
+            x: player.x,
+            y: player.y
         });
     }
 }
@@ -164,7 +170,7 @@ function draw() {
 
 function drawPlayer() {
     ctx.beginPath();
-    ctx.arc(playerX, playerY, playerSize, 0, 2 * Math.PI, false);
+    ctx.arc(player.x, player.y, player.size, 0, 2 * Math.PI, false);
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 }
@@ -256,13 +262,21 @@ var Key = {
 // Wire the event listeners
 window.addEventListener('keyup', function(event) { Key.onKeyup(event); }, false);
 window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, false);
+window.addEventListener("devicemotion", onMotionChange, false);
 
-// SMARTPHONE - Use the accelerometer if possible
-window.ondevicemotion = function(event) {
-    playerSpeedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
-    playerSpeedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
+// DEVICES WITH MOTIONSENSORS
+// ===================================
+// Thanks to: https://github.com/ajfisher/deviceapi-normaliser
+// for the deviceapi mishmash handling.
+// ===================================
+function onMotionChange(event) {
+    var motion = deviceMotion(event);
+
+    player.speedX += Math.round(motion.accelerationIncludingGravity.x*10) / 400;  
+    player.speedY -= Math.round(motion.accelerationIncludingGravity.y*10) / 400;
 }
 
 // RUN! Starts the 'game'...
+mo.init();
 gameState = gameStates.TIMED;
 requestAnimationFrame(mainLoop);
