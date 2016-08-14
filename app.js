@@ -4,14 +4,17 @@ console.log('Setting initial values...');
 // Initial declarations
 // GAME
 var gameStates = Object.freeze({
-    START:  0,
-    TIMED:  1,
-    END:    2
+    CONNECTING: 0,
+    START:      1,
+    TIMED:      2,
+    PAUSED:     3,
+    END:        4
 });
 var isRunning = true;
 var gameState = gameStates.START;
 var gameTime = Date.now(), gameEnd = Date.now() + 15000;
 var gameInfo = document.getElementById("gameinfo");
+var ws;
 
 // CANVAS
 var cnv = document.getElementById('cnv');
@@ -41,6 +44,25 @@ var target = generateTarget();
 var currentTarget = 0;
 var animationQueue = [];
 
+
+function startGame() {
+    gameState = gameStates.CONNECTING;
+    ws = new WebSocket("ws://localhost:9000/websocket");
+    // Start game when server connection is established
+    ws.onopen = function(event) {
+        gameState = gameStates.TIMED;
+        requestAnimationFrame(mainLoop);
+    }
+    // Receive messages from server
+    ws.onmessage = function (event) {
+        var reader = new FileReader();
+        reader.addEventListener('loadend', function() {
+            console.log(reader.result);
+        });
+        reader.readAsBinaryString(event.data);
+    }
+}
+
 // MAIN LOOP
 function mainLoop(timecalled) {
     // Don't do work if it's not time yet
@@ -53,6 +75,7 @@ function mainLoop(timecalled) {
 
     if(gameState === gameStates.END && isRunning) {
         toggleRun();
+        ws.close();
         return;
     }
 
@@ -140,6 +163,8 @@ function checkTargetCollision() {
             x: player.x,
             y: player.y
         });
+
+        ws.send(JSON.stringify(player));
     }
 }
 
@@ -265,18 +290,17 @@ window.addEventListener('keydown', function(event) { Key.onKeydown(event); }, fa
 window.addEventListener("devicemotion", onMotionChange, false);
 
 // DEVICES WITH MOTIONSENSORS
-// ===================================
-// Thanks to: https://github.com/ajfisher/deviceapi-normaliser
-// for the deviceapi mishmash handling.
-// ===================================
 function onMotionChange(event) {
-    var motion = deviceMotion(event);
-
-    player.speedX += Math.round(motion.accelerationIncludingGravity.x*10) / 400;  
-    player.speedY -= Math.round(motion.accelerationIncludingGravity.y*10) / 400;
+    player.speedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
+    player.speedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
 }
 
-// RUN! Starts the 'game'...
-mo.init();
-gameState = gameStates.TIMED;
-requestAnimationFrame(mainLoop);
+// Click or tap the canvas for start/toggle
+$('canvas').bind('click tap', function(e) {
+    if(gameState === gameStates.START) {
+        startGame();
+    }
+    else {
+        toggleRun();
+    }
+})
