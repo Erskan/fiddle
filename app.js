@@ -6,12 +6,16 @@ console.log('Setting initial values...');
 var gameStates = Object.freeze({
     CONNECTING: 0,
     START:      1,
-    TIMED:      2,
-    PAUSED:     3,
-    END:        4
+    PAUSED:     2,
+    END:        3
+});
+var gameModes = Object.freeze({
+    MULTI:  0,
+    SINGLE: 1
 });
 var isRunning = true;
 var gameState = gameStates.START;
+var gameMode;
 var gameTime = Date.now(), gameEnd = Date.now() + 15000;
 var gameInfo = document.getElementById("gameinfo");
 var ws;
@@ -35,22 +39,39 @@ var player = {
     size:   20,
     x:      100,
     y:      100,
-    acc:    0.003,
+    acc:    0.005,
     speedX: 0,
-    speedY: 0
+    speedY: 0,
+    model:  '0'
 };
 // Target variables
 var target = generateTarget();
 var currentTarget = 0;
 var animationQueue = [];
 
+function setSinglePlayer() {
+    $('#menu').hide();
+    $('canvas').show();
+    gameMode = gameModes.SINGLE;
+    gameInfo.innerHTML = "Drop an image on the canvas to use as your player model or click to start.";
+}
 
-function startGame() {
+function setMultiPlayer() {
+    $('#menu').hide();
+    $('canvas').show();
+    gameMode = gameModes.MULTI;
+    gameInfo.innerHTML = "Drop an image on the canvas to use as your player model or click to start.";
+}
+
+function startSingleGame() {
+    requestAnimationFrame(mainLoop);
+}
+
+function startMultiGame() {
     gameState = gameStates.CONNECTING;
     ws = new WebSocket("ws://localhost:9000/websocket");
     // Start game when server connection is established
     ws.onopen = function(event) {
-        gameState = gameStates.TIMED;
         requestAnimationFrame(mainLoop);
     }
     // Receive messages from server
@@ -75,7 +96,7 @@ function mainLoop(timecalled) {
 
     if(gameState === gameStates.END && isRunning) {
         toggleRun();
-        ws.close();
+        ws.close(); // Errors if not connected to socket.
         return;
     }
 
@@ -99,13 +120,13 @@ function updateMovement(delta) {
         player.speedY -= player.acc*delta;
     } 
     if (Key.isDown(Key.LEFT)) {
-        player.speedX -= player.acc*delta*2; // Horizontal acceleration feels sluggish
+        player.speedX -= player.acc*delta; // Horizontal acceleration feels sluggish
     }
     if (Key.isDown(Key.DOWN)) {
         player.speedY += player.acc*delta;
     }
     if (Key.isDown(Key.RIGHT)) {
-        player.speedX += player.acc*delta*2; // Horizontal acceleration feels sluggish
+        player.speedX += player.acc*delta; // Horizontal acceleration feels sluggish
     }
 }
 
@@ -163,8 +184,8 @@ function checkTargetCollision() {
             x: player.x,
             y: player.y
         });
-
-        ws.send(JSON.stringify(player));
+        if(gameMode === gameModes.MULTI)
+            ws.send(JSON.stringify(player));
     }
 }
 
@@ -295,6 +316,8 @@ function onMotionChange(event) {
     player.speedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
 }
 
+$('canvas').hide();
+
 // Click or tap the canvas for start/toggle
 $('canvas').bind('click tap', function(e) {
     if(gameState === gameStates.START) {
@@ -304,3 +327,77 @@ $('canvas').bind('click tap', function(e) {
         toggleRun();
     }
 })
+
+
+// UTILS
+// ===================================
+// Thanks to: http://www.htmlgoodies.com/html5/javascript/drag-files-into-the-browser-from-the-desktop-HTML5.html
+// for the drag and drop image code.
+// ===================================
+function addEventHandler(obj, evt, handler) {
+    if(obj.addEventListener) {
+        // W3C method
+        obj.addEventListener(evt, handler, false);
+    } else if(obj.attachEvent) {
+        // IE method.
+        obj.attachEvent('on'+evt, handler);
+    } else {
+        // Old school method.
+        obj['on'+evt] = handler;
+    }
+}
+
+Function.prototype.bindToEventHandler = function bindToEventHandler() {
+    var handler = this;
+    var boundParameters = Array.prototype.slice.call(arguments);
+    //create closure
+    return function(e) {
+        e = e || window.event; // get window.event if e argument missing (in IE)   
+        boundParameters.unshift(e);
+        handler.apply(this, boundParameters);
+    }
+};
+
+if(window.FileReader) { 
+    addEventHandler(window, 'load', function() {
+        var status = document.getElementById('gameinfo');
+        var drop   = document.getElementById('cnv');
+
+        function cancel(e) {
+            if (e.preventDefault) { e.preventDefault(); }
+            return false;
+        }
+
+        // Tells the browser that we *can* drop on this target
+        addEventHandler(drop, 'dragover', cancel);
+        addEventHandler(drop, 'dragenter', cancel);
+        addEventHandler(drop, 'drop', function (e) {
+            e = e || window.event; // get window.event if e argument missing (in IE)   
+            if (e.preventDefault) { e.preventDefault(); } // stops the browser from redirecting off to the image.
+
+            var dt    = e.dataTransfer;
+            var files = dt.files;
+            for (var i=0; i<files.length; i++) {
+                var file = files[i];
+                var reader = new FileReader();
+
+                addEventHandler(reader, 'loadend', function(e, file) {
+                    var bin           = this.result; 
+                    var newFile       = document.createElement('div');
+                    newFile.innerHTML = 'Loaded : '+file.name+' size '+file.size+' B';
+
+                    var img = document.createElement("img"); 
+                    img.file = file;   
+                    img.src = bin;
+                    ctx.drawImage(img,10,10,20,20);
+                }.bindToEventHandler(file));
+
+                reader.readAsDataURL(file);
+            }
+            return false;
+        });
+    });
+} else { 
+    document.getElementById('status').innerHTML = 'Your browser does not support the HTML5 FileReader.';
+}
+
