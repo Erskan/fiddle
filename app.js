@@ -36,19 +36,20 @@ var frameID;
 
 // PLAYER AND OBJECTS
 var player = {
-    size:   20,
+    size:   40,
     x:      100,
     y:      100,
     acc:    0.005,
     speedX: 0,
     speedY: 0,
-    model:  '0'
+    model:  new Image()
 };
 // Target variables
 var target = generateTarget();
 var currentTarget = 0;
 var animationQueue = [];
 
+// Set game mode and launch game
 function setSinglePlayer() {
     $('#menu').hide();
     $('canvas').show();
@@ -63,11 +64,11 @@ function setMultiPlayer() {
     gameInfo.innerHTML = "Drop an image on the canvas to use as your player model or click to start.";
 }
 
-function startSingleGame() {
-    requestAnimationFrame(mainLoop);
-}
-
-function startMultiGame() {
+function startGame() {
+    if(gameMode === gameModes.SINGLE) {
+        requestAnimationFrame(mainLoop);
+        return;
+    }
     gameState = gameStates.CONNECTING;
     ws = new WebSocket("ws://localhost:9000/websocket");
     // Start game when server connection is established
@@ -96,7 +97,8 @@ function mainLoop(timecalled) {
 
     if(gameState === gameStates.END && isRunning) {
         toggleRun();
-        ws.close(); // Errors if not connected to socket.
+        if(gameMode === gameModes.MULTI)
+            ws.close();
         return;
     }
 
@@ -215,10 +217,14 @@ function draw() {
 }
 
 function drawPlayer() {
-    ctx.beginPath();
-    ctx.arc(player.x, player.y, player.size, 0, 2 * Math.PI, false);
-    ctx.strokeStyle = '#000000';
-    ctx.stroke();
+    if(player.model.src)
+        ctx.drawImage(player.model, player.x, player.y, player.size, player.size);
+    else
+        setDefaultPlayerModel(); // We drop a frame to set model
+}
+
+function setDefaultPlayerModel() {
+    player.model.src = "player.png";
 }
 
 function drawTargets() {
@@ -389,7 +395,7 @@ if(window.FileReader) {
                     var img = document.createElement("img"); 
                     img.file = file;   
                     img.src = bin;
-                    ctx.drawImage(img,10,10,20,20);
+                    player.model = img;
                 }.bindToEventHandler(file));
 
                 reader.readAsDataURL(file);
