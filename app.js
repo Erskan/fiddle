@@ -36,12 +36,14 @@ var frameID;
 
 // PLAYER AND OBJECTS
 var player = {
+    name:   'testName',
     size:   40,
     x:      100,
     y:      100,
     acc:    0.005,
     speedX: 0,
     speedY: 0,
+    ip:     '1.2.3.4',
     model:  new Image()
 };
 // Target variables
@@ -74,6 +76,7 @@ function startGame() {
     // Start game when server connection is established
     ws.onopen = function(event) {
         requestAnimationFrame(mainLoop);
+        ws.send(JSON.stringify(player));
     }
     // Receive messages from server
     ws.onmessage = function (event) {
@@ -161,19 +164,27 @@ function updatePositions(delta) {
 
     checkGameBoundaries();
     checkTargetCollision();
+
+    // Update server with our player
+    if(gameMode === gameModes.MULTI) {
+        ws.send(JSON.stringify({
+            message:    'player',
+            player:     player
+        }));
+    }
 }
 
 // Don't allow exiting the game boundaries. Bounce back.
 function checkGameBoundaries() {
-    if((player.y <= player.size && player.speedY < 0) || (player.y >= cnv.height - player.size && player.speedY > 0))
+    if((player.y + player.size <= player.size && player.speedY < 0) || (player.y >= cnv.height - player.size && player.speedY > 0))
         player.speedY = -1*player.speedY/2;
-    if((player.x <= player.size && player.speedX < 0) || (player.x >= cnv.width - player.size && player.speedX > 0))
+    if((player.x + player.size <= player.size && player.speedX < 0) || (player.x >= cnv.width - player.size && player.speedX > 0))
         player.speedX = -1*player.speedX/2;
 }
 
 function checkTargetCollision() {
-    var xDiff = Math.abs(player.x - target['x']);
-    var yDiff = Math.abs(player.y - target['y']);
+    var xDiff = Math.abs(player.x + player.size/2 - target['x']);
+    var yDiff = Math.abs(player.y + player.size/2 - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
         currentTarget++;
         target = generateTarget();
@@ -186,8 +197,6 @@ function checkTargetCollision() {
             x: player.x,
             y: player.y
         });
-        if(gameMode === gameModes.MULTI)
-            ws.send(JSON.stringify(player));
     }
 }
 
