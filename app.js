@@ -43,7 +43,10 @@ var player = {
     acc:    0.005,
     speedX: 0,
     speedY: 0,
-    ip:     '1.2.3.4',
+    id:     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+                return v.toString(16);
+            }),
     model:  new Image()
 };
 // Target variables
@@ -76,7 +79,10 @@ function startGame() {
     // Start game when server connection is established
     ws.onopen = function(event) {
         requestAnimationFrame(mainLoop);
-        ws.send(JSON.stringify(player));
+        ws.send(JSON.stringify({
+            message:    'player',
+            player:     player
+        }));
     }
     // Receive messages from server
     ws.onmessage = function (event) {
@@ -100,8 +106,13 @@ function mainLoop(timecalled) {
 
     if(gameState === gameStates.END && isRunning) {
         toggleRun();
-        if(gameMode === gameModes.MULTI)
+        if(gameMode === gameModes.MULTI) {
+            ws.send(JSON.stringify({
+                message:    'endgame',
+                player:     player
+            }));
             ws.close();
+        }
         return;
     }
 
