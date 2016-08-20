@@ -43,6 +43,7 @@ var player = {
     acc:    0.005,
     speedX: 0,
     speedY: 0,
+    points: 0,
     id:     'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
                 var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
                 return v.toString(16);
@@ -70,6 +71,7 @@ function setMultiPlayer() {
 }
 
 function startGame() {
+    gameInfo.innerHTML = "";
     if(gameMode === gameModes.SINGLE) {
         requestAnimationFrame(mainLoop);
         return;
@@ -111,7 +113,7 @@ function mainLoop(timecalled) {
                 message:    'endgame',
                 player:     player
             }));
-            ws.close();
+            window.setTimeout(ws.close(), 1000);
         }
         return;
     }
@@ -197,7 +199,7 @@ function checkTargetCollision() {
     var xDiff = Math.abs(player.x + player.size/2 - target['x']);
     var yDiff = Math.abs(player.y + player.size/2 - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
-        currentTarget++;
+        player.points++;
         target = generateTarget();
         gameEnd += 2000;
         animationQueue.push({
@@ -213,7 +215,7 @@ function checkTargetCollision() {
 
 function generateTarget() {
     return {
-        id: currentTarget,
+        id: currentTarget++,
         size: 10,
         x: Math.floor(Math.random()*(cnv.width - 20)) + 20, // 20 = 2*radius
         y: Math.floor(Math.random()*(cnv.height - 20)) + 20
@@ -269,7 +271,7 @@ function drawAnimations() {
 
 function drawGUI() {
     ctx.font = '20pt Helvetica';
-    ctx.fillText(currentTarget, 30, 40);
+    ctx.fillText(player.points, 30, 40);
     gameTime = Date.now();
     if((gameEnd - gameTime)/1000 <= 0) {
         gameState = gameStates.END;
