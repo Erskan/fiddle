@@ -115,7 +115,8 @@ function startGame() {
             var message = JSON.parse(reader.result);
             switch(message.message) {
                 case 'newtarget':
-                    generateTarget(message.target);
+                    if(message.target.Id !== target.id)
+                        generateTarget(message.target);
                     break;
             }
             console.log(message);
@@ -228,7 +229,7 @@ function updatePositions(delta) {
         ws.send(JSON.stringify({
             message:    'player',
             player:     player,
-            target:     target /* TODO: there is some fuckery going on here where this can be null */
+            target:     {id: target.id, x: 0, y: 0, size: 10} /* TODO: Fix: x, y are integers on server side. Ignore for now. */
         }));
     }
 }
@@ -246,8 +247,11 @@ function checkTargetCollision() {
     var yDiff = Math.abs(player.y + player.size/2 - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
         player.points++;
-        //target = {};
-        //generateTarget(); /* Should sent some sort of register point request to server */
+        ws.send(JSON.stringify({
+            message:    'registerpoint',
+            player:     player,
+            target:     {id: target.id, x: 0, y: 0, size: 10}
+        }));
         gameEnd += 2000;
         animationQueue.push({
             start: Date.now(),
@@ -261,12 +265,13 @@ function checkTargetCollision() {
 }
 
 function generateTarget(newTarget) {
+    console.log("Generating new target...");
     target = {
-        id:     newTarget.id,
-        x:      cnv.width * (newTarget.x / 100),
-        y:      cnv.height * (newTarget.y / 100),
-        size:   newTarget.size
-    }
+        id:     newTarget.Id,
+        x:      cnv.width * (newTarget.X / 100),
+        y:      cnv.height * (newTarget.Y / 100),
+        size:   newTarget.Size
+    };
 }
 
 // SIMULATION CONTROL
