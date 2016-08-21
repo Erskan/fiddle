@@ -1,7 +1,9 @@
 'use strict';
 
 console.log('Setting initial values...');
+// ============================================================================
 // Initial declarations
+// ============================================================================
 // GAME
 var gameStates = Object.freeze({
     CONNECTING: 0,
@@ -51,10 +53,18 @@ var player = {
     model:  new Image()
 };
 // Target variables
-var target = generateTarget();
+var target = {};
 var currentTarget = 0;
 var animationQueue = [];
 
+// ============================================================================
+//                                                         Initial declarations
+// ============================================================================
+
+
+// ============================================================================
+// Launching of the game
+// ============================================================================
 // Set game mode and launch game
 function setSinglePlayer() {
     $('#menu').hide();
@@ -81,13 +91,35 @@ function startGame() {
     // Start game when server connection is established
     ws.onopen = function(event) {
         requestAnimationFrame(mainLoop);
+        // Tell server we have a player
         ws.send(JSON.stringify({
-            message:    'player',
+            message:    'start',
             player:     player
         }));
+        /* Request current target from server
+        ws.send(JSON.stringify({
+            message:    'targetrequest',
+            player:     player
+        }));*/
     }
     // Receive messages from server
     ws.onmessage = function (event) {
+        var reader = new FileReader();
+        reader.addEventListener('loadend', function() {
+            // TODO: Switch on message type and handle it
+            var message = JSON.parse(reader.result);
+            switch(message.message) {
+                case 'newtarget':
+                    generateTarget(message.target);
+                    break;
+            }
+            console.log(message);
+        });
+        reader.readAsBinaryString(event.data);
+    }
+    // Error in websocket communication
+    ws.onerror = function (event) {
+        console.log("ERROR: Error reported in WebSocket!");
         var reader = new FileReader();
         reader.addEventListener('loadend', function() {
             console.log(reader.result);
@@ -96,6 +128,14 @@ function startGame() {
     }
 }
 
+// ============================================================================
+//                                                        Launching of the game
+// ============================================================================
+
+
+// ============================================================================
+// Running game logic
+// ============================================================================
 // MAIN LOOP
 function mainLoop(timecalled) {
     // Don't do work if it's not time yet
@@ -113,7 +153,7 @@ function mainLoop(timecalled) {
                 message:    'endgame',
                 player:     player
             }));
-            window.setTimeout(ws.close(), 1000);
+            ws.close(); /* TODO: Find out how to end this in a good way */
         }
         return;
     }
@@ -138,13 +178,13 @@ function updateMovement(delta) {
         player.speedY -= player.acc*delta;
     } 
     if (Key.isDown(Key.LEFT)) {
-        player.speedX -= player.acc*delta; // Horizontal acceleration feels sluggish
+        player.speedX -= player.acc*delta;
     }
     if (Key.isDown(Key.DOWN)) {
         player.speedY += player.acc*delta;
     }
     if (Key.isDown(Key.RIGHT)) {
-        player.speedX += player.acc*delta; // Horizontal acceleration feels sluggish
+        player.speedX += player.acc*delta;
     }
 }
 
@@ -200,7 +240,8 @@ function checkTargetCollision() {
     var yDiff = Math.abs(player.y + player.size/2 - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
         player.points++;
-        target = generateTarget();
+        target = {};
+        //generateTarget(); /* Should sent some sort of register point request to server */
         gameEnd += 2000;
         animationQueue.push({
             start: Date.now(),
@@ -213,16 +254,48 @@ function checkTargetCollision() {
     }
 }
 
-function generateTarget() {
-    return {
-        id: currentTarget++,
-        size: 10,
-        x: Math.floor(Math.random()*(cnv.width - 20)) + 20, // 20 = 2*radius
-        y: Math.floor(Math.random()*(cnv.height - 20)) + 20
-    };
+function generateTarget(newTarget) {
+    target = {
+        id:     newTarget.id,
+        x:      cnv.width * (newTarget.x / 100),
+        y:      cnv.height * (newTarget.y / 100),
+        size:   newTarget.size
+    }
 }
 
-// DRAWING
+// SIMULATION CONTROL
+// Toggles simulation of time
+function toggleRun() {
+    isRunning = isRunning ? false : true;
+    if(isRunning) {
+        startRun();
+    }
+    else {
+        stopRun();
+    }
+}
+
+function stopRun() {
+    gameInfo.innerHTML = "GAME STOPPED";
+    cancelAnimationFrame(frameID);
+}
+
+function startRun() {
+    frameID = requestAnimationFrame(function(timestamp) {
+        gameInfo.innerHTML = "";
+        lastTimeCalled = timestamp;
+        frameID = requestAnimationFrame(mainLoop);
+    });
+}
+
+// ============================================================================
+//                                                           Running game logic
+// ============================================================================
+
+
+// ============================================================================
+// Drawing functionality
+// ============================================================================
 // Draws the canvas according to state
 function draw() {
     // Clear area for fresh drawing
@@ -279,33 +352,13 @@ function drawGUI() {
     }
     ctx.fillText((gameEnd - gameTime)/1000, cnv.width - 100, cnv.height - 40);
 }
+// ============================================================================
+//                                                        Drawing functionality
+// ============================================================================
 
-// SIMULATION CONTROL
-// Toggles simulation of time
-function toggleRun() {
-    isRunning = isRunning ? false : true;
-    if(isRunning) {
-        startRun();
-    }
-    else {
-        stopRun();
-    }
-}
-
-function stopRun() {
-    gameInfo.innerHTML = "GAME STOPPED";
-    cancelAnimationFrame(frameID);
-}
-
-function startRun() {
-    frameID = requestAnimationFrame(function(timestamp) {
-        gameInfo.innerHTML = "";
-        lastTimeCalled = timestamp;
-        frameID = requestAnimationFrame(mainLoop);
-    });
-}
-
-// KEYBOARD
+// ============================================================================
+// Input control
+// ============================================================================
 // ===================================
 // Thanks to: http://nokarma.org/2011/02/27/javascript-game-development-keyboard-input/
 // for the key object help.
@@ -355,9 +408,13 @@ $('canvas').bind('click tap', function(e) {
         toggleRun();
     }
 })
+// ============================================================================
+//                                                                Input control
+// ============================================================================
 
-
-// UTILS
+// ============================================================================
+// Utilities (Drag and drop etc.)
+// ============================================================================
 // ===================================
 // Thanks to: http://www.htmlgoodies.com/html5/javascript/drag-files-into-the-browser-from-the-desktop-HTML5.html
 // for the drag and drop image code.
@@ -429,3 +486,6 @@ if(window.FileReader) {
     document.getElementById('status').innerHTML = 'Your browser does not support the HTML5 FileReader.';
 }
 
+// ============================================================================
+//                                               Utilities (Drag and drop etc.)
+// ============================================================================
