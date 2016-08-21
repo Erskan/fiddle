@@ -18,7 +18,7 @@ var gameModes = Object.freeze({
 var isRunning = true;
 var gameState = gameStates.START;
 var gameMode;
-var gameTime = Date.now(), gameEnd = Date.now() + 15000;
+var gameTime = Date.now(), gameEnd = Date.now() + 1500000; /* Loads of time for debug reasons.. */
 var gameInfo = document.getElementById("gameinfo");
 var ws;
 
@@ -53,7 +53,12 @@ var player = {
     model:  new Image()
 };
 // Target variables
-var target = {};
+var target = {
+    id:     '00000000-0000-0000-0000-000000000000',
+    x:      0,
+    y:      0,
+    size:   10
+};
 var currentTarget = 0;
 var animationQueue = [];
 
@@ -218,11 +223,12 @@ function updatePositions(delta) {
     checkGameBoundaries();
     checkTargetCollision();
 
-    // Update server with our player
+    // Update server with our player and target
     if(gameMode === gameModes.MULTI) {
         ws.send(JSON.stringify({
             message:    'player',
-            player:     player
+            player:     player,
+            target:     target /* TODO: there is some fuckery going on here where this can be null */
         }));
     }
 }
@@ -240,7 +246,7 @@ function checkTargetCollision() {
     var yDiff = Math.abs(player.y + player.size/2 - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
         player.points++;
-        target = {};
+        //target = {};
         //generateTarget(); /* Should sent some sort of register point request to server */
         gameEnd += 2000;
         animationQueue.push({
