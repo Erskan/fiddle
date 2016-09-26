@@ -11,14 +11,8 @@ var gameStates = Object.freeze({
     PAUSED:     2,
     END:        3
 });
-var gameModes = Object.freeze({
-    MULTI:  0,
-    SINGLE: 1
-});
 var isRunning = true;
 var gameState = gameStates.START;
-var gameMode;
-var gameTime = Date.now(), gameEnd = Date.now() + 1500000; /* Loads of time for debug reasons.. */
 var gameInfo = document.getElementById("gameinfo");
 var ws;
 
@@ -70,31 +64,20 @@ var animationQueue = [];
 // ============================================================================
 // Launching of the game
 // ============================================================================
-// Set game mode and launch game
-function setSinglePlayer() {
-    $('#menu').hide();
-    $('canvas').show();
-    gameMode = gameModes.SINGLE;
-    gameInfo.innerHTML = "Drop an image on the canvas to use as your player model or click to start.";
-}
 
-function setMultiPlayer() {
+function setPrep() {
     $('#menu').hide();
     $('canvas').show();
-    gameMode = gameModes.MULTI;
     gameInfo.innerHTML = "Drop an image on the canvas to use as your player model or click to start.";
 }
 
 function startGame() {
-    gameInfo.innerHTML = "";
-    if(gameMode === gameModes.SINGLE) {
-        requestAnimationFrame(mainLoop);
-        return;
-    }
+    gameInfo.innerHTML = "Connecting to game server...";
     gameState = gameStates.CONNECTING;
     ws = new WebSocket("ws://localhost:9000/websocket");
     // Start game when server connection is established
     ws.onopen = function(event) {
+        gameInfo.innerHTML = "";
         requestAnimationFrame(mainLoop);
         // Tell server we have a player
         ws.send(JSON.stringify({
@@ -126,11 +109,20 @@ function startGame() {
     // Error in websocket communication
     ws.onerror = function (event) {
         console.log("ERROR: Error reported in WebSocket!");
+        gameInfo.innerHTML = "There was en error connecting to the game server. Please try again later.";
+        $('#menu').show();
         var reader = new FileReader();
         reader.addEventListener('loadend', function() {
             console.log(reader.result);
         });
-        reader.readAsBinaryString(event.data);
+        // If we fail to even connect there will be an error when trying to read event.
+        try {
+            reader.readAsBinaryString(event.data);
+        }
+        catch(e) {
+            console.log(e);
+        }
+        
     }
 }
 
@@ -154,13 +146,11 @@ function mainLoop(timecalled) {
 
     if(gameState === gameStates.END && isRunning) {
         toggleRun();
-        if(gameMode === gameModes.MULTI) {
-            ws.send(JSON.stringify({
-                message:    'endgame',
-                player:     player
-            }));
-            ws.close(); /* TODO: Find out how to end this in a good way */
-        }
+        ws.send(JSON.stringify({
+            message:    'endgame',
+            player:     player
+        }));
+        ws.close(); /* TODO: Find out how to end this in a good way */
         return;
     }
 
@@ -224,12 +214,27 @@ function updatePositions(delta) {
     checkGameBoundaries();
     checkTargetCollision();
 
-    // Update server with our player and target
-    if(gameMode === gameModes.MULTI) {
+    // Update server with our player and target if socket is open
+    if(ws.readyState === 1) {
         ws.send(JSON.stringify({
-            message:    'player',
-            player:     player,
-            target:     {id: target.id, x: 0, y: 0, size: 10} /* TODO: Fix: x, y are integers on server side. Ignore for now. */
+            message:    'tick',
+            player:     {
+                name:       player.name,
+                size:       player.size,
+                x:          player.x,
+                y:          player.y,
+                acc:        player.acc,
+                speedX:     player.speedX,
+                speedY:     player.speedY,
+                points:     player.points,
+                id:         player.id,
+                model:      '' // Don't send model again... Images can be large, yo.
+            },
+            target:     {
+                id:         target.id, 
+                x:          0, 
+                y:          0, 
+                size:       10} /* x, y, size not important on server side */
         }));
     }
 }
@@ -252,12 +257,11 @@ function checkTargetCollision() {
             player:     player,
             target:     {id: target.id, x: 0, y: 0, size: 10}
         }));
-        gameEnd += 2000;
         animationQueue.push({
             start: Date.now(),
             end: Date.now() + 2000,
             type: 'text',
-            value: '+2s',
+            value: '+1 point',
             x: player.x,
             y: player.y
         });
@@ -356,12 +360,7 @@ function drawAnimations() {
 function drawGUI() {
     ctx.font = '20pt Helvetica';
     ctx.fillText(player.points, 30, 40);
-    gameTime = Date.now();
-    if((gameEnd - gameTime)/1000 <= 0) {
-        gameState = gameStates.END;
-        return;
-    }
-    ctx.fillText((gameEnd - gameTime)/1000, cnv.width - 100, cnv.height - 40);
+    /* TODO: Make scoreboard */
 }
 // ============================================================================
 //                                                        Drawing functionality
