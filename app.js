@@ -30,8 +30,8 @@ var lastTimeCalled = 0;
 var maxFPS = 60;
 var frameID;
 
-// PLAYER AND OBJECTS
-var player = {
+// PLAYERS AND OBJECTS
+var players = [{
     name:   'testName',
     size:   40,
     x:      100,
@@ -45,7 +45,10 @@ var player = {
                 return v.toString(16);
             }),
     model:  new Image()
-};
+}];
+
+var opponents = [];
+
 // Target variables
 var target = {
     id:     '00000000-0000-0000-0000-000000000000',
@@ -77,12 +80,11 @@ function startGame() {
     ws = new WebSocket("ws://localhost:9000/websocket");
     // Start game when server connection is established
     ws.onopen = function(event) {
-        gameInfo.innerHTML = "";
-        requestAnimationFrame(mainLoop);
+        console.log(players);
         // Tell server we have a player
         ws.send(JSON.stringify({
             message:    'start',
-            player:     player
+            players:     players
         }));
         /* Request current target from server
         ws.send(JSON.stringify({
@@ -100,6 +102,11 @@ function startGame() {
                 case 'newtarget':
                     if(message.target.Id !== target.id)
                         generateTarget(message.target);
+                    break;
+                case 'start':
+                    gameInfo.innerHTML = "";
+                    populateGame(message);
+                    requestAnimationFrame(mainLoop);
                     break;
             }
             console.log(message);
@@ -134,6 +141,10 @@ function startGame() {
 // ============================================================================
 // Running game logic
 // ============================================================================
+// POPULATE THE GAME WORLD WITH EXISTING ACTORS
+function populateGame(message) {
+
+}
 // MAIN LOOP
 function mainLoop(timecalled) {
     // Don't do work if it's not time yet
@@ -148,7 +159,7 @@ function mainLoop(timecalled) {
         toggleRun();
         ws.send(JSON.stringify({
             message:    'endgame',
-            player:     player
+            players:     players
         }));
         ws.close(); /* TODO: Find out how to end this in a good way */
         return;
@@ -171,16 +182,16 @@ function update(delta) {
 
 function updateMovement(delta) {
     if (Key.isDown(Key.UP)) {
-        player.speedY -= player.acc*delta;
+        players[0].speedY -= players[0].acc*delta;
     } 
     if (Key.isDown(Key.LEFT)) {
-        player.speedX -= player.acc*delta;
+        players[0].speedX -= players[0].acc*delta;
     }
     if (Key.isDown(Key.DOWN)) {
-        player.speedY += player.acc*delta;
+        players[0].speedY += players[0].acc*delta;
     }
     if (Key.isDown(Key.RIGHT)) {
-        player.speedX += player.acc*delta;
+        players[0].speedX += players[0].acc*delta;
     }
 }
 
@@ -199,17 +210,17 @@ function updateAnimations(delta) {
 
 // Change positional state based on speed
 function updatePositions(delta) {
-    player.y += player.speedY;
-    player.x += player.speedX;
+    players[0].y += players[0].speedY;
+    players[0].x += players[0].speedX;
     // Retardation
-    if (player.speedX < 0.01 && player.speedX > -0.01)
-        player.speedX = 0;
+    if (players[0].speedX < 0.01 && players[0].speedX > -0.01)
+        players[0].speedX = 0;
     else
-        player.speedX -= (player.speedX > 0) ? player.acc/2*delta : (player.acc/2)*-1*delta;
-    if (player.speedY < 0.01 && player.speedY > -0.01)
-        player.speedY = 0;
+        players[0].speedX -= (players[0].speedX > 0) ? players[0].acc/2*delta : (players[0].acc/2)*-1*delta;
+    if (players[0].speedY < 0.01 && players[0].speedY > -0.01)
+        players[0].speedY = 0;
     else
-        player.speedY -= (player.speedY > 0) ? player.acc/2*delta : (player.acc/2)*-1*delta;
+        players[0].speedY -= (players[0].speedY > 0) ? players[0].acc/2*delta : (players[0].acc/2)*-1*delta;
 
     checkGameBoundaries();
     checkTargetCollision();
@@ -218,18 +229,18 @@ function updatePositions(delta) {
     if(ws.readyState === 1) {
         ws.send(JSON.stringify({
             message:    'tick',
-            player:     {
-                name:       player.name,
-                size:       player.size,
-                x:          player.x,
-                y:          player.y,
-                acc:        player.acc,
-                speedX:     player.speedX,
-                speedY:     player.speedY,
-                points:     player.points,
-                id:         player.id,
+            players:     [{
+                name:       players[0].name,
+                size:       players[0].size,
+                x:          players[0].x,
+                y:          players[0].y,
+                acc:        players[0].acc,
+                speedX:     players[0].speedX,
+                speedY:     players[0].speedY,
+                points:     players[0].points,
+                id:         players[0].id,
                 model:      '' // Don't send model again... Images can be large, yo.
-            },
+            }],
             target:     {
                 id:         target.id, 
                 x:          0, 
@@ -241,20 +252,31 @@ function updatePositions(delta) {
 
 // Don't allow exiting the game boundaries. Bounce back.
 function checkGameBoundaries() {
-    if((player.y + player.size <= player.size && player.speedY < 0) || (player.y >= cnv.height - player.size && player.speedY > 0))
-        player.speedY = -1*player.speedY/2;
-    if((player.x + player.size <= player.size && player.speedX < 0) || (player.x >= cnv.width - player.size && player.speedX > 0))
-        player.speedX = -1*player.speedX/2;
+    if((players[0].y + players[0].size <= players[0].size && players[0].speedY < 0) || (players[0].y >= cnv.height - players[0].size && players[0].speedY > 0))
+        players[0].speedY = -1*players[0].speedY/2;
+    if((players[0].x + players[0].size <= players[0].size && players[0].speedX < 0) || (players[0].x >= cnv.width - players[0].size && players[0].speedX > 0))
+        players[0].speedX = -1*players[0].speedX/2;
 }
 
 function checkTargetCollision() {
-    var xDiff = Math.abs(player.x + player.size/2 - target['x']);
-    var yDiff = Math.abs(player.y + player.size/2 - target['y']);
+    var xDiff = Math.abs(players[0].x + players[0].size/2 - target['x']);
+    var yDiff = Math.abs(players[0].y + players[0].size/2 - target['y']);
     if(xDiff < target['size'] && yDiff < target['size']) {
-        player.points++;
+        players[0].points++;
         ws.send(JSON.stringify({
             message:    'registerpoint',
-            player:     player,
+            players:     [{
+                name:       players[0].name,
+                size:       players[0].size,
+                x:          players[0].x,
+                y:          players[0].y,
+                acc:        players[0].acc,
+                speedX:     players[0].speedX,
+                speedY:     players[0].speedY,
+                points:     players[0].points,
+                id:         players[0].id,
+                model:      '' // Don't send model again... Images can be large, yo.
+            }],
             target:     {id: target.id, x: 0, y: 0, size: 10}
         }));
         animationQueue.push({
@@ -262,8 +284,8 @@ function checkTargetCollision() {
             end: Date.now() + 2000,
             type: 'text',
             value: '+1 point',
-            x: player.x,
-            y: player.y
+            x: players[0].x,
+            y: players[0].y
         });
     }
 }
@@ -327,14 +349,14 @@ function draw() {
 }
 
 function drawPlayer() {
-    if(player.model.src)
-        ctx.drawImage(player.model, player.x, player.y, player.size, player.size);
+    if(players[0].model.src)
+        ctx.drawImage(players[0].model, players[0].x, players[0].y, players[0].size, players[0].size);
     else
         setDefaultPlayerModel(); // We drop a frame to set model
 }
 
 function setDefaultPlayerModel() {
-    player.model.src = "player.png";
+    players[0].model.src = "player.png";
 }
 
 function drawTargets() {
@@ -359,7 +381,7 @@ function drawAnimations() {
 
 function drawGUI() {
     ctx.font = '20pt Helvetica';
-    ctx.fillText(player.points, 30, 40);
+    ctx.fillText(players[0].points, 30, 40);
     /* TODO: Make scoreboard */
 }
 // ============================================================================
@@ -403,8 +425,8 @@ window.addEventListener("devicemotion", onMotionChange, false);
 
 // DEVICES WITH MOTIONSENSORS
 function onMotionChange(event) {
-    player.speedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
-    player.speedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
+    players[0].speedX += Math.round(event.accelerationIncludingGravity.x*10) / 400;  
+    players[0].speedY -= Math.round(event.accelerationIncludingGravity.y*10) / 400;
 }
 
 $('canvas').hide();
@@ -484,7 +506,7 @@ if(window.FileReader) {
                     var img = document.createElement("img"); 
                     img.file = file;   
                     img.src = bin;
-                    player.model = img;
+                    players[0].model = img;
                 }.bindToEventHandler(file));
 
                 reader.readAsDataURL(file);
