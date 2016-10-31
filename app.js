@@ -77,7 +77,7 @@ function setPrep() {
 function startGame() {
     gameInfo.innerHTML = "Connecting to game server...";
     gameState = gameStates.CONNECTING;
-    ws = new WebSocket("ws://localhost:9000/websocket");
+    ws = new WebSocket("ws://192.168.1.11:9000/websocket/");
     // Start game when server connection is established
     ws.onopen = function(event) {
         console.log(players);
@@ -99,7 +99,7 @@ function startGame() {
             // TODO: Switch on message type and handle it
             var message = JSON.parse(reader.result);
             switch(message.message) {
-                case 'newtarget':
+                case 'tick':
                     if(message.target.Id !== target.id)
                         generateTarget(message.target);
                     break;
