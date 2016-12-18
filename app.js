@@ -6,7 +6,7 @@ console.log('Setting initial values...');
 // ============================================================================
 // GAME
 var gameStates = Object.freeze({
-    CONNECTING: 0,
+    CONNECTED: 0,
     START:      1,
     PAUSED:     2,
     END:        3
@@ -21,8 +21,6 @@ var cnv = document.getElementById('cnv');
 cnv.width = window.innerWidth;
 cnv.height = window.innerHeight;
 var ctx = cnv.getContext("2d");
-/* Set origo in the center of the canvas*/
-//ctx.translate(cnv.width/2, cnv.height/2);
 
 // TIMING
 var delta = 0;
@@ -47,16 +45,13 @@ var players = [{
     model:  new Image()
 }];
 
-var opponents = [];
-
-// Target variables
 var target = {
     id:     '00000000-0000-0000-0000-000000000000',
     x:      0,
     y:      0,
     size:   10
 };
-var currentTarget = 0;
+
 var animationQueue = [];
 
 // ============================================================================
@@ -76,21 +71,15 @@ function setPrep() {
 
 function startGame() {
     gameInfo.innerHTML = "Connecting to game server...";
-    gameState = gameStates.CONNECTING;
     ws = new WebSocket("ws://192.168.1.11:9000/websocket/");
     // Start game when server connection is established
     ws.onopen = function(event) {
-        console.log(players);
+        //console.log(players);
         // Tell server we have a player
         ws.send(JSON.stringify({
             message:    'start',
             players:     players
         }));
-        /* Request current target from server
-        ws.send(JSON.stringify({
-            message:    'targetrequest',
-            player:     player
-        }));*/
     }
     // Receive messages from server
     ws.onmessage = function (event) {
@@ -98,18 +87,45 @@ function startGame() {
         reader.addEventListener('loadend', function() {
             // TODO: Switch on message type and handle it
             var message = JSON.parse(reader.result);
+            if(gameState === gameStates.START){
+                gameInfo.innerHTML = "";
+                populateGame(message);
+                gameState = gameStates.CONNECTED;
+                requestAnimationFrame(mainLoop);
+            }
             switch(message.message) {
                 case 'tick':
                     if(message.target.Id !== target.id)
                         generateTarget(message.target);
+                    // Update server with our player and target if socket is open
+                    if(ws.readyState === 1) {
+                        ws.send(JSON.stringify({
+                            message:    'tick',
+                            players:     [{
+                                name:       players[0].name,
+                                size:       players[0].size,
+                                x:          players[0].x,
+                                y:          players[0].y,
+                                acc:        players[0].acc,
+                                speedX:     players[0].speedX,
+                                speedY:     players[0].speedY,
+                                points:     players[0].points,
+                                id:         players[0].id,
+                                model:      '' // Don't send model again... Images can be large, yo.
+                            }],
+                            target:     {
+                                id:         target.id, 
+                                x:          0, 
+                                y:          0, 
+                                size:       10} /* x, y, size not important on server side */
+                        }));
+                    }
                     break;
-                case 'start':
-                    gameInfo.innerHTML = "";
-                    populateGame(message);
-                    requestAnimationFrame(mainLoop);
+                default:
+                    console.log("Message type not recognized. Client update needed?");
                     break;
             }
-            console.log(message);
+            //console.log(message);
         });
         reader.readAsBinaryString(event.data);
     }
@@ -225,29 +241,6 @@ function updatePositions(delta) {
     checkGameBoundaries();
     checkTargetCollision();
 
-    // Update server with our player and target if socket is open
-    if(ws.readyState === 1) {
-        ws.send(JSON.stringify({
-            message:    'tick',
-            players:     [{
-                name:       players[0].name,
-                size:       players[0].size,
-                x:          players[0].x,
-                y:          players[0].y,
-                acc:        players[0].acc,
-                speedX:     players[0].speedX,
-                speedY:     players[0].speedY,
-                points:     players[0].points,
-                id:         players[0].id,
-                model:      '' // Don't send model again... Images can be large, yo.
-            }],
-            target:     {
-                id:         target.id, 
-                x:          0, 
-                y:          0, 
-                size:       10} /* x, y, size not important on server side */
-        }));
-    }
 }
 
 // Don't allow exiting the game boundaries. Bounce back.
@@ -291,7 +284,7 @@ function checkTargetCollision() {
 }
 
 function generateTarget(newTarget) {
-    console.log("Generating new target...");
+    //console.log("Generating new target...");
     target = {
         id:     newTarget.Id,
         x:      cnv.width * (newTarget.X / 100),
